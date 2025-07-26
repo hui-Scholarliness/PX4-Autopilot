@@ -15,4 +15,4 @@ int8 selected_airspeed_index 			# 1-3: airspeed sensor index, 0: groundspeed-win
 
 float32 airspeed_derivative_filtered		# filtered indicated airspeed derivative [m/s/s]
 float32 throttle_filtered			# filtered fixed-wing throttle [-]
-float32 pitch_filtered				# filtered pitch [rad]
+float32 pitch_filtered				# filtered pitch [rad] 
