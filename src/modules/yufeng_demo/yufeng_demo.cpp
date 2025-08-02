@@ -80,16 +80,68 @@ void yufeng_demo::Run() {
   perf_begin(_cycle_perf);
   vehicle_local_position_s vehicle_local_position;
 
-  if (_local_pos_sub.update(&vehicle_local_position))
-  {
-	printf("hello sky!\r\n");
+  if (_local_pos_sub.update(&vehicle_local_position)) {
+    if (_param_yu_feng_en.get()) {
+      printf("hello sky!\r\n");
+    } else {
+      printf("hello land!\r\n");
+    }
   }
 
   perf_end(_cycle_perf);
 }
 
-void yufeng_demo::parameters_update(bool force)
-{
+void yufeng_demo::parameters_update(bool force) {
+  if (_parameter_update_sub.updated() || force) 
+  {
+    // clear update
+    parameter_update_s pupdate;
+    _parameter_update_sub.copy(&pupdate);
+
+    // update parameters from storage
+    ModuleParams::updateParams();
+
+    float sample_freq_hz = 1.f / _sample_interval_s.mean();
+
+    // velocity notch filter
+    if ((_param_mpc_vel_nf_frq.get() > 0.f) &&
+        (_param_mpc_vel_nf_bw.get() > 0.f)) {
+      _vel_xy_notch_filter.setParameters(sample_freq_hz,
+                                         _param_mpc_vel_nf_frq.get(),
+                                         _param_mpc_vel_nf_bw.get());
+      _vel_z_notch_filter.setParameters(sample_freq_hz,
+                                        _param_mpc_vel_nf_frq.get(),
+                                        _param_mpc_vel_nf_bw.get());
+
+    } else {
+      _vel_xy_notch_filter.disable();
+      _vel_z_notch_filter.disable();
+    }
+
+    // velocity xy/z low pass filter
+    if (_param_mpc_vel_lp.get() > 0.f) {
+      _vel_xy_lp_filter.setCutoffFreq(sample_freq_hz, _param_mpc_vel_lp.get());
+      _vel_z_lp_filter.setCutoffFreq(sample_freq_hz, _param_mpc_vel_lp.get());
+
+    } else {
+      // disable filtering
+      _vel_xy_lp_filter.setAlpha(1.f);
+      _vel_z_lp_filter.setAlpha(1.f);
+    }
+
+    // velocity derivative xy/z low pass filter
+    if (_param_mpc_veld_lp.get() > 0.f) {
+      _vel_deriv_xy_lp_filter.setCutoffFreq(sample_freq_hz,
+                                            _param_mpc_veld_lp.get());
+      _vel_deriv_z_lp_filter.setCutoffFreq(sample_freq_hz,
+                                           _param_mpc_veld_lp.get());
+
+    } else {
+      // disable filtering
+      _vel_deriv_xy_lp_filter.setAlpha(1.f);
+      _vel_deriv_z_lp_filter.setAlpha(1.f);
+    }
+  }
 }
 
 int yufeng_demo::task_spawn(int argc, char *argv[])

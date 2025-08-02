@@ -32,101 +32,24 @@
  ****************************************************************************/
 
 /**
- * Vertical thrust required to hover
+ * yufeng Enable
  *
- * Mapped to center throttle stick in Stabilized mode (see MPC_THR_CURVE).
- * Used for initialization of the hover thrust estimator (see MPC_USE_HTE).
- * The estimated hover thrust is used as base for zero vertical acceleration in altitude control.
- * The hover thrust is important for land detection to work correctly.
- *
- * @unit norm
- * @min 0.1
- * @max 0.8
- * @decimal 2
- * @increment 0.01
- * @group Multicopter Position Control
- */
-// PARAM_DEFINE_FLOAT(MPC_THR_HOVER, 0.5f);
-
-/**
- * Use hover thrust estimate for altitude control
- *
- * Disable to use the fixed parameter MPC_THR_HOVER instead of the hover thrust estimate in the position controller.
- * This parameter does not influence Stabilized mode throttle curve (see MPC_THR_CURVE).
+ * Display the yufeng hello sky.
  *
  * @boolean
- * @group Multicopter Position Control
+ * group demo
  */
-// PARAM_DEFINE_INT32(MPC_USE_HTE, 1);
+PARAM_DEFINE_INT32(YU_FENG_EN, 1);
 
 /**
- * Horizontal thrust margin
+ * yufeng length
  *
- * Margin that is kept for horizontal control when higher priority vertical thrust is saturated.
- * To avoid completely starving horizontal control with high vertical error.
- *
- * @unit norm
- * @min 0
- * @max 0.5
- * @decimal 2
+ * yufeng UAV length
+ * @unit m
+ * @min 0.0
+ * @max 1.0
+ * @decimal 3
  * @increment 0.01
- * @group Multicopter Position Control
+ * @group Demo
  */
-// PARAM_DEFINE_FLOAT(MPC_THR_XY_MARG, 0.3f);
-
-/**
- * Velocity low pass cutoff frequency
- *
- * A value of 0 disables the filter.
- *
- * @unit Hz
- * @min 0
- * @max 50
- * @decimal 1
- * @increment 0.5
- * @group Multicopter Position Control
- */
-// PARAM_DEFINE_FLOAT(MPC_VEL_LP, 0.0f);
-
-/**
- * Velocity notch filter frequency
- *
- * The center frequency for the 2nd order notch filter on the velocity.
- * A value of 0 disables the filter.
- *
- * @unit Hz
- * @min 0
- * @max 50
- * @decimal 1
- * @increment 0.5
- * @group Multicopter Position Control
- */
-// PARAM_DEFINE_FLOAT(MPC_VEL_NF_FRQ, 0.0f);
-
-/**
- * Velocity notch filter bandwidth
- *
- * A value of 0 disables the filter.
- *
- * @unit Hz
- * @min 0
- * @max 50
- * @decimal 1
- * @increment 0.5
- * @group Multicopter Position Control
- */
-// PARAM_DEFINE_FLOAT(MPC_VEL_NF_BW, 5.0f);
-
-/**
- * Velocity derivative low pass cutoff frequency
- *
- * A value of 0 disables the filter.
- *
- * @unit Hz
- * @min 0
- * @max 50
- * @decimal 1
- * @increment 0.5
- * @group Multicopter Position Control
- */
-// PARAM_DEFINE_FLOAT(MPC_VELD_LP, 5.0f);
+PARAM_DEFINE_FLOAT(YU_FENG_LEN,0.225f);

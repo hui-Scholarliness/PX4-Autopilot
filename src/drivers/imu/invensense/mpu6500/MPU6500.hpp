@@ -69,7 +69,7 @@ public:
 private:
 	void exit_and_cleanup() override;
 
-	// Sensor Configuration
+	// Sensor Configuration 
 	static constexpr float FIFO_SAMPLE_DT{1e6f / 8000.f};
 	static constexpr int32_t SAMPLES_PER_TRANSFER{2};                    // ensure at least 1 new accel sample per transfer
 	static constexpr float GYRO_RATE{1e6f / FIFO_SAMPLE_DT};             // 8000 Hz gyro

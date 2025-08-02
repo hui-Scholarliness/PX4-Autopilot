@@ -91,4 +91,10 @@ private:
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle time")};
 	uORB::SubscriptionCallbackWorkItem _local_pos_sub{this, ORB_ID(vehicle_local_position)};
 	uORB::Publication<vehicle_attitude_setpoint_s>	     _vehicle_attitude_setpoint_pub{ORB_ID(vehicle_attitude_setpoint)};
+
+        DEFINE_PARAMETERS(
+            // Position Control
+            (ParamFloat<px4::params::YU_FENG_LEN>)_param_yu_feng_len,
+            (ParamInt<px4::params::YU_FENG_EN>)_param_yu_feng_en
+	);
 };
