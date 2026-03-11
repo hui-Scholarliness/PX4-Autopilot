@@ -84,18 +84,21 @@ public:
 
 	bool init();
 
-       private:
-        void Run() override;
-        void parameters_update(bool force);
-        hrt_abstime _time_stamp_last_loop{0};
-        perf_counter_t _cycle_perf{
-            perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
-        uORB::SubscriptionCallbackWorkItem _local_pos_sub{
-            this,
-            ORB_ID(vehicle_local_position)}; /**< vehicle local position */
-        DEFINE_PARAMETERS(
-            // Position Control
-            (ParamFloat<px4::params::YU_FENG_LEN>)_param_yu_feng_len,
-            (ParamInt<px4::params::YU_FENG_EN>)_param_yu_feng_en
+private:
+    void Run() override;
+    void parameters_update(bool force);
+    hrt_abstime _time_stamp_last_loop{0};
+    uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+    perf_counter_t _cycle_perf{
+    perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
+    uORB::SubscriptionCallbackWorkItem _local_pos_sub{
+    this,
+    ORB_ID(vehicle_local_position)}; /**< vehicle local position */
+    bool yu_feng_en;
+    float yu_feng_len;
+    DEFINE_PARAMETERS(
+    // Position Control
+    (ParamFloat<px4::params::YU_FENG_LEN>)_param_yu_feng_len,
+    (ParamInt<px4::params::YU_FENG_EN>)_param_yu_feng_en
 	);
 };
