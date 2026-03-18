@@ -92,6 +92,7 @@ void YuFengDemo::Run() {
 
   if (_local_pos_sub.update(&vehicle_local_position))
   {
+
     const float dt = math::constrain(
         ((vehicle_local_position.timestamp_sample - _time_stamp_last_loop) *
          1e-6f),
@@ -104,6 +105,20 @@ void YuFengDemo::Run() {
     else
     {
       printf("hello land!\r\n");
+    }
+
+    //uORB示范
+    sensor_combined_s imu;
+    if(_sensor_combined_sub.update(&imu))
+    {
+      yufeng_demo_s yufeng;
+      yufeng.enble=true;
+      yufeng.timestamp=hrt_absolute_time();
+      yufeng.acc[0]=imu.accelerometer_m_s2[0];
+      yufeng.acc[1]=imu.accelerometer_m_s2[1];
+      yufeng.acc[2]=imu.accelerometer_m_s2[2];
+      yufeng.acc_norm=sqrt(yufeng.acc[0]*yufeng.acc[0]+yufeng.acc[1]*yufeng.acc[1]+yufeng.acc[2]*yufeng.acc[2]);
+      _yufeng_demo_pub.publish(yufeng);
     }
 
   }

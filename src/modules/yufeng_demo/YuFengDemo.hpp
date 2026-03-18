@@ -38,24 +38,17 @@
 #pragma once
 
 #include <drivers/drv_hrt.h>
-#include <lib/mathlib/math/filter/AlphaFilter.hpp>
-#include <lib/mathlib/math/filter/NotchFilter.hpp>
-#include <lib/mathlib/math/WelfordMean.hpp>
 #include <lib/perf/perf_counter.h>
-#include <lib/slew_rate/SlewRateYaw.hpp>
 #include <lib/systemlib/mavlink_log.h>
-#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <px4_platform_common/posix.h>
+#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/tasks.h>
-#include <uORB/Publication.hpp>
-#include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/hover_thrust_estimate.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/sensor_combined.h>  //包含了各种传感器数据
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_constraints.h>
@@ -63,42 +56,55 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/yufeng_demo.h>
 
+#include <lib/mathlib/math/WelfordMean.hpp>
+#include <lib/mathlib/math/filter/AlphaFilter.hpp>
+#include <lib/mathlib/math/filter/NotchFilter.hpp>
+#include <lib/slew_rate/SlewRateYaw.hpp>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 using namespace time_literals;
 
-class YuFengDemo : public ModuleBase<YuFengDemo>, public ModuleParams,
-	public px4::ScheduledWorkItem
-{
-public:
-	YuFengDemo();
-	~YuFengDemo() override;
+class YuFengDemo : public ModuleBase<YuFengDemo>,
+                   public ModuleParams,
+                   public px4::ScheduledWorkItem {
+ public:
+  YuFengDemo();
+  ~YuFengDemo() override;
 
-	/** @see ModuleBase */
-	static int task_spawn(int argc, char *argv[]);
+  /** @see ModuleBase */
+  static int task_spawn(int argc, char* argv[]);
 
-	/** @see ModuleBase */
-	static int custom_command(int argc, char *argv[]);
+  /** @see ModuleBase */
+  static int custom_command(int argc, char* argv[]);
 
-	/** @see ModuleBase */
-	static int print_usage(const char *reason = nullptr);
+  /** @see ModuleBase */
+  static int print_usage(const char* reason = nullptr);
 
-	bool init();
+  bool init();
 
-private:
-    void Run() override;
-    void parameters_update(bool force);
-    hrt_abstime _time_stamp_last_loop{0};
-    uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-    perf_counter_t _cycle_perf{
-    perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
-    uORB::SubscriptionCallbackWorkItem _local_pos_sub{
-    this,
-    ORB_ID(vehicle_local_position)}; /**< vehicle local position */
-    bool yu_feng_en;
-    float yu_feng_len;
-    DEFINE_PARAMETERS(
-    // Position Control
-    (ParamFloat<px4::params::YU_FENG_LEN>)_param_yu_feng_len,
-    (ParamInt<px4::params::YU_FENG_EN>)_param_yu_feng_en
-	);
+ private:
+  void Run() override;
+  void parameters_update(bool force);
+  hrt_abstime _time_stamp_last_loop{0};
+  uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update),
+                                                   1_s};
+  uORB::Subscription _sensor_combined_sub{
+      ORB_ID(sensor_combined)};  // 新增，用来订阅话加速度话题消息
+
+  uORB::Publication<yufeng_demo_s> _yufeng_demo_pub{
+      ORB_ID(yufeng_demo)};
+  perf_counter_t _cycle_perf{
+      perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
+  uORB::SubscriptionCallbackWorkItem _local_pos_sub{
+      this, ORB_ID(vehicle_local_position)}; /**< vehicle local position */
+  bool yu_feng_en;
+  float yu_feng_len;
+  DEFINE_PARAMETERS(
+      // Position Control
+      (ParamFloat<px4::params::YU_FENG_LEN>)_param_yu_feng_len,
+      (ParamInt<px4::params::YU_FENG_EN>)_param_yu_feng_en);
 };
