@@ -104,12 +104,13 @@ void PositionControl::setInputSetpoint(const trajectory_setpoint_s &setpoint)
 	_yaw_sp = setpoint.yaw;
 	_yawspeed_sp = setpoint.yawspeed;
 }
-
+//此类的入口
 bool PositionControl::update(const float dt)
 {
 	bool valid = _inputValid();
 
 	if (valid) {
+		//位置环 (Position Control)：外环纯 P 控制
 		_positionControl();
 		_velocityControl(dt);
 
@@ -121,37 +122,54 @@ bool PositionControl::update(const float dt)
 	return valid && _acc_sp.isAllFinite() && _thr_sp.isAllFinite();
 }
 
+//计算出飞机当前到底需要多大的速度（期望速度 _vel_sp），才能顺利飞到目标位置
 void PositionControl::_positionControl()
 {
 	// P-position controller
+	//纯比例（P）控制器：计算基础期望速度
+	//_pos_sp：目标位置（期望值）
+	//_pos：当前位置（测量值）
+	//_gain_pos_p：位置环的 P 参数
+	//emult()：矩阵的逐元素相乘
 	Vector3f vel_sp_position = (_pos_sp - _pos).emult(_gain_pos_p);
 	// Position and feed-forward velocity setpoints or position states being NAN results in them not having an influence
+	//最终的期望速度 = 上层规划的前馈速度 + P 控制器算出的纠偏速度。
+	//这样不仅能完美贴合预设航线，还能随时纠正被风吹偏产生的误差
 	ControlMath::addIfNotNanVector3f(_vel_sp, vel_sp_position);
 	// make sure there are no NAN elements for further reference while constraining
+	//在进入下一步的数学限幅运算前，必须把这些 NAN 强制变为 0。
+	//否则任何数字加上 NAN 都会变成乱码，导致整个飞控逻辑崩溃
 	ControlMath::setZeroIfNanVector3f(vel_sp_position);
 
 	// Constrain horizontal velocity by prioritizing the velocity component along the
 	// the desired position setpoint over the feed-forward term.
+	//水平限幅（XY轴）：
 	_vel_sp.xy() = ControlMath::constrainXY(vel_sp_position.xy(), (_vel_sp - vel_sp_position).xy(), _lim_vel_horizontal);
 	// Constrain velocity in z-direction.
+	//垂直限幅（Z轴）
 	_vel_sp(2) = math::constrain(_vel_sp(2), -_lim_vel_up, _lim_vel_down);
 }
 
 void PositionControl::_velocityControl(const float dt)
 {
 	// Constrain vertical velocity integral
+	//垂直积分硬限幅
 	_vel_int(2) = math::constrain(_vel_int(2), -CONSTANTS_ONE_G, CONSTANTS_ONE_G);
 
 	// PID velocity control
 	Vector3f vel_error = _vel_sp - _vel;
+	//常规的 D 项是对误差求导，但这里是 - _vel_dot.emult(_gain_vel_d)（减去实际加速度乘 $K_d$）
+	//当你猛推遥杆让期望速度 _vel_sp 突变时，如果对误差求导，D 项会瞬间输出一个无穷大的“毛刺”（微分爆炸）。
+	//只对实际测量值（当前加速度 _vel_dot）做微分，既保留了阻尼效果，又完美避开了指令突变带来的震荡。
 	Vector3f acc_sp_velocity = vel_error.emult(_gain_vel_p) + _vel_int - _vel_dot.emult(_gain_vel_d);
 
 	// No control input from setpoints or corresponding states which are NAN
 	ControlMath::addIfNotNanVector3f(_acc_sp, acc_sp_velocity);
 
-	_accelerationControl();
+	_accelerationControl();//降维姿态控制，把理想的加速度 _acc_sp 转换为理想的集体推力 _thr_sp 和姿态角
 
 	// Integrator anti-windup in vertical direction
+	//Z 轴（垂直方向）的条件积分抗饱和
 	if ((_thr_sp(2) >= -_lim_thr_min && vel_error(2) >= 0.f) ||
 	    (_thr_sp(2) <= -_lim_thr_max && vel_error(2) <= 0.f)) {
 		vel_error(2) = 0.f;
@@ -163,13 +181,18 @@ void PositionControl::_velocityControl(const float dt)
 	const float thrust_max_squared = math::sq(_lim_thr_max);
 
 	// Determine how much vertical thrust is left keeping horizontal margin
+	//优先保证高度（Z轴），兼顾一点点姿态（XY轴边距），剩下的全给高度，再剩下的才给水平加速。
+	//1、哪怕垂直掉高度了，也必须硬挤出一点点推力（_lim_thr_xy_margin）给 XY 轴。因为完全失去水平推力，飞机就无法维持姿态，会直接翻滚坠机。
 	const float allocated_horizontal_thrust = math::min(thrust_sp_xy_norm, _lim_thr_xy_margin);
+	//2、满足 Z 轴（垂直优先）：利用勾股定理算剩余推力
 	const float thrust_z_max_squared = thrust_max_squared - math::sq(allocated_horizontal_thrust);
 
 	// Saturate maximal vertical thrust
+	//对2中进行限幅
 	_thr_sp(2) = math::max(_thr_sp(2), -sqrtf(thrust_z_max_squared));
 
 	// Determine how much horizontal thrust is left after prioritizing vertical control
+	//3、把残渣分给 XY 轴（水平次之）
 	const float thrust_max_xy_squared = thrust_max_squared - math::sq(_thr_sp(2));
 	float thrust_max_xy = 0.f;
 
@@ -184,6 +207,16 @@ void PositionControl::_velocityControl(const float dt)
 
 	// Use tracking Anti-Windup for horizontal direction: during saturation, the integrator is used to unsaturate the output
 	// see Anti-Reset Windup for PID controllers, L.Rundqwist, 1990
+	//XY 轴的高级抗饱和：反向计算
+	/**
+	 * 刚才第 4 步里，XY 轴的推力可能因为优先级低被强行裁剪了。
+
+	物理上，飞机实际能产生的加速度 acc_sp_xy_produced 变小了。
+
+	算法使用了经典的 Rundqwist 1990 抗积分饱和法 (Tracking Anti-Windup)：既然物理输出被限幅了，我就倒推回去，主动减小输入给积分器的误差 vel_error.xy()。
+
+	就像老板（油门）不批预算，中层经理（抗饱和模块）就回去对基层（积分器）撒谎说“客户其实没要那么多”，防止基层积怨（积分爆炸）。
+	 */
 	const Vector2f acc_sp_xy_produced = Vector2f(_thr_sp) * (CONSTANTS_ONE_G / _hover_thrust);
 
 	// The produced acceleration can be greater or smaller than the desired acceleration due to the saturations and the actual vertical thrust (computed independently).
@@ -198,24 +231,28 @@ void PositionControl::_velocityControl(const float dt)
 	// Make sure integral doesn't get NAN
 	ControlMath::setZeroIfNanVector3f(vel_error);
 	// Update integral part of velocity control
+	//6. 更新积分器
 	_vel_int += vel_error.emult(_gain_vel_i) * dt;
 }
 
 void PositionControl::_accelerationControl()
 {
 	// Assume standard acceleration due to gravity in vertical direction for attitude generation
-	float z_specific_force = -CONSTANTS_ONE_G;
-
+	float z_specific_force = -CONSTANTS_ONE_G;//抵消重力：为了让无人机不掉下来，首先必须提供一个向上抵消重力的加速度。
+	//耦合选项：如果飞控没有开启“水平垂直解耦”，那么实际的 Z 轴期望比力，还要加上速度环要求飞机主动爬升或下降的加速度 _acc_sp(2)
 	if (!_decouple_horizontal_and_vertical_acceleration) {
 		// Include vertical acceleration setpoint for better horizontal acceleration tracking
 		z_specific_force += _acc_sp(2);
 	}
-
+	//2. 构造期望的机身 Z 轴方向（PPT里的 $\mathbf{e}_d$）
 	Vector3f body_z = Vector3f(-_acc_sp(0), -_acc_sp(1), -z_specific_force).normalized();
+	//3. 圆锥倾斜限制（保命机制）
 	ControlMath::limitTilt(body_z, Vector3f(0, 0, 1), _lim_tilt);
 	// Convert to thrust assuming hover thrust produces standard gravity
+	//4. 计算垂直方向需要的“油门量”
 	const float thrust_ned_z = _acc_sp(2) * (_hover_thrust / CONSTANTS_ONE_G) - _hover_thrust;
 	// Project thrust to planned body attitude
+	//5. 投影到倾斜机身并计算最终推力
 	const float cos_ned_body = (Vector3f(0, 0, 1).dot(body_z));
 	const float collective_thrust = math::min(thrust_ned_z / cos_ned_body, -_lim_thr_min);
 	_thr_sp = body_z * collective_thrust;

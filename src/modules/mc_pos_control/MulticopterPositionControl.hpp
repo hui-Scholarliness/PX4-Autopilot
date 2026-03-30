@@ -174,6 +174,7 @@ private:
 		(ParamFloat<px4::params::MPC_THR_XY_MARG>)  _param_mpc_thr_xy_marg,
 
 		(ParamFloat<px4::params::SYS_VEHICLE_RESP>) _param_sys_vehicle_resp,
+		//这里的MPC是指多旋翼的控制，不是模型预测控制
 		(ParamFloat<px4::params::MPC_ACC_HOR>)      _param_mpc_acc_hor,
 		(ParamFloat<px4::params::MPC_ACC_DOWN_MAX>) _param_mpc_acc_down_max,
 		(ParamFloat<px4::params::MPC_ACC_UP_MAX>)   _param_mpc_acc_up_max,

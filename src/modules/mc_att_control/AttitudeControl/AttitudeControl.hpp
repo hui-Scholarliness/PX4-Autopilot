@@ -45,7 +45,7 @@
  *
  * https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/154099/eth-7387-01.pdf
  */
-
+//算出飞机现在该以多大的**期望角速度（rate_setpoint）**去转动
 #pragma once
 
 #include <matrix/matrix/math.hpp>
