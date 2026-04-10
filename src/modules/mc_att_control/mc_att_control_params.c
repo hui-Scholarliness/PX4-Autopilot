@@ -158,3 +158,12 @@ PARAM_DEFINE_FLOAT(MC_YAWRATE_MAX, 200.0f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_FLOAT(MC_MAN_TILT_TAU, 0.0f);
+
+/**
+ * Attitude control method
+ *
+ * @value 0 Quat control(default)
+ * @value 1 SO3 control
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_ATTI_METHOD, 0);

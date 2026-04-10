@@ -33,21 +33,16 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
 #include <perf/perf_counter.h>
-#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/posix.h>
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
-#include <uORB/Publication.hpp>
-#include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
-#include <uORB/topics/manual_control_setpoint.h>
-#include <uORB/topics/parameter_update.h>
+#include <px4_platform_common/px4_config.h>
 #include <uORB/topics/autotune_attitude_control_status.h>
 #include <uORB/topics/hover_thrust_estimate.h>
+#include <uORB/topics/manual_control_setpoint.h>
+#include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
@@ -55,120 +50,145 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+
+#include <AttitudeControl.hpp>
+#include <SO3Control.hpp>
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/slew_rate/SlewRate.hpp>
 #include <lib/stick_yaw/StickYaw.hpp>
-
-#include <AttitudeControl.hpp>
+#include <matrix/matrix/math.hpp>
+#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+#include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 
 using namespace time_literals;
+//att姿态转换的方式枚举
+enum MC_ATTI_METHOD_m { ATTI_METHOD_AUAT = 0, ATTI_METHOD_SO3 = 1 };
 
-class MulticopterAttitudeControl : public ModuleBase<MulticopterAttitudeControl>, public ModuleParams,
-	public px4::WorkItem
-{
-public:
-	MulticopterAttitudeControl(bool vtol = false);
-	~MulticopterAttitudeControl() override;
+class MulticopterAttitudeControl
+    : public ModuleBase<MulticopterAttitudeControl>,
+      public ModuleParams,
+      public px4::WorkItem {
+ public:
+  MulticopterAttitudeControl(bool vtol = false);
+  ~MulticopterAttitudeControl() override;
 
-	/** @see ModuleBase */
-	static int task_spawn(int argc, char *argv[]);
+  /** @see ModuleBase */
+  static int task_spawn(int argc, char* argv[]);
 
-	/** @see ModuleBase */
-	static int custom_command(int argc, char *argv[]);
+  /** @see ModuleBase */
+  static int custom_command(int argc, char* argv[]);
 
-	/** @see ModuleBase */
-	static int print_usage(const char *reason = nullptr);
+  /** @see ModuleBase */
+  static int print_usage(const char* reason = nullptr);
 
-	bool init();
+  bool init();
 
-private:
-	void Run() override;
+ private:
+  void Run() override;
 
-	/**
-	 * initialize some vectors/matrices from parameters
-	 */
-	void parameters_updated();
+  /**
+   * initialize some vectors/matrices from parameters
+   */
+  void parameters_updated();
 
-	float throttle_curve(float throttle_stick_input);
+  float throttle_curve(float throttle_stick_input);
 
-	/**
-	 * Generate & publish an attitude setpoint from stick inputs
-	 */
-	void generate_attitude_setpoint(const matrix::Quatf &q, float dt);
+  /**
+   * Generate & publish an attitude setpoint from stick inputs
+   */
+  void generate_attitude_setpoint(const matrix::Quatf& q, float dt);
 
-	AttitudeControl _attitude_control; /**< class for attitude control calculations */
-	StickYaw _stick_yaw{this};
+  AttitudeControl
+      _attitude_control; /**< class for attitude control calculations */
+  SO3Control _so3_control;
+  StickYaw _stick_yaw{this};
 
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+  uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update),
+                                                   1_s};
 
-	uORB::Subscription _hover_thrust_estimate_sub{ORB_ID(hover_thrust_estimate)};
-	uORB::Subscription _vehicle_attitude_setpoint_sub{ORB_ID(vehicle_attitude_setpoint)};
-	uORB::Subscription _autotune_attitude_control_status_sub{ORB_ID(autotune_attitude_control_status)};
-	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
-	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
-	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
-	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
-	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+  uORB::Subscription _hover_thrust_estimate_sub{ORB_ID(hover_thrust_estimate)};
+  uORB::Subscription _vehicle_attitude_setpoint_sub{
+      ORB_ID(vehicle_attitude_setpoint)};
+  uORB::Subscription _autotune_attitude_control_status_sub{
+      ORB_ID(autotune_attitude_control_status)};
+  uORB::Subscription _manual_control_setpoint_sub{
+      ORB_ID(manual_control_setpoint)};
+  uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
+  uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
+  uORB::Subscription _vehicle_local_position_sub{
+      ORB_ID(vehicle_local_position)};
+  uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 
-	uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{this, ORB_ID(vehicle_attitude)};
+  uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{
+      this, ORB_ID(vehicle_attitude)};
 
-	uORB::Publication<vehicle_rates_setpoint_s>     _vehicle_rates_setpoint_pub{ORB_ID(vehicle_rates_setpoint)};    /**< rate setpoint publication */
-	uORB::Publication<vehicle_attitude_setpoint_s>  _vehicle_attitude_setpoint_pub;
+  uORB::Publication<vehicle_rates_setpoint_s> _vehicle_rates_setpoint_pub{
+      ORB_ID(vehicle_rates_setpoint)}; /**< rate setpoint publication */
+  uORB::Publication<vehicle_attitude_setpoint_s> _vehicle_attitude_setpoint_pub;
 
-	manual_control_setpoint_s       _manual_control_setpoint {};    /**< manual control setpoint */
-	vehicle_control_mode_s          _vehicle_control_mode {};       /**< vehicle control mode */
+  manual_control_setpoint_s
+      _manual_control_setpoint{}; /**< manual control setpoint */
+  vehicle_control_mode_s _vehicle_control_mode{}; /**< vehicle control mode */
 
-	perf_counter_t  _loop_perf;             /**< loop duration performance counter */
+  perf_counter_t _loop_perf; /**< loop duration performance counter */
 
-	matrix::Vector3f _thrust_setpoint_body; /**< body frame 3D thrust vector */
+  matrix::Vector3f _thrust_setpoint_body; /**< body frame 3D thrust vector */
 
-	float _hover_thrust_estimate{NAN};
-	SlewRate<float> _hover_thrust_slew_rate{.5f};
+  float _hover_thrust_estimate{NAN};
+  SlewRate<float> _hover_thrust_slew_rate{.5f};
 
-	float _yaw_setpoint_stabilized{0.f};
-	bool _heading_good_for_control{true}; // initialized true to have heading lock when local position never published
-	float _unaided_heading{NAN}; // initialized NAN to not distract heading lock when local position never published
-	float _man_tilt_max{0.f};			/**< maximum tilt allowed for manual flight [rad] */
+  float _yaw_setpoint_stabilized{0.f};
+  bool _heading_good_for_control{
+      true};  // initialized true to have heading lock when local position never
+              // published
+  float _unaided_heading{NAN};  // initialized NAN to not distract heading lock
+                                // when local position never published
+  float _man_tilt_max{0.f}; /**< maximum tilt allowed for manual flight [rad] */
 
-	SlewRate<float> _manual_throttle_minimum{0.f}; ///< 0 when landed and ramped to MPC_MANTHR_MIN in air
-	SlewRate<float> _manual_throttle_maximum{0.f}; ///< 0 when disarmed ramped to 1 when spooled up
-	AlphaFilter<float> _man_roll_input_filter;
-	AlphaFilter<float> _man_pitch_input_filter;
+  SlewRate<float> _manual_throttle_minimum{
+      0.f};  ///< 0 when landed and ramped to MPC_MANTHR_MIN in air
+  SlewRate<float> _manual_throttle_maximum{
+      0.f};  ///< 0 when disarmed ramped to 1 when spooled up
+  AlphaFilter<float> _man_roll_input_filter;
+  AlphaFilter<float> _man_pitch_input_filter;
 
-	hrt_abstime _last_run{0};
-	hrt_abstime _last_attitude_setpoint{0};
+  hrt_abstime _last_run{0};
+  hrt_abstime _last_attitude_setpoint{0};
 
-	bool _spooled_up{false}; ///< used to make sure the vehicle cannot take off during the spoolup time
-	bool _landed{true};
-	bool _vehicle_type_rotary_wing{true};
-	bool _vtol{false};
-	bool _vtol_tailsitter{false};
-	bool _vtol_in_transition_mode{false};
+  bool _spooled_up{false};  ///< used to make sure the vehicle cannot take off
+                            ///< during the spoolup time
+  bool _landed{true};
+  bool _vehicle_type_rotary_wing{true};
+  bool _vtol{false};
+  bool _vtol_tailsitter{false};
+  bool _vtol_in_transition_mode{false};
 
-	uint8_t _quat_reset_counter{0};
+  uint8_t _quat_reset_counter{0};
+  uint8_t _mc_atti_method{0};
 
-	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::MC_AIRMODE>)         _param_mc_airmode,
-		(ParamFloat<px4::params::MC_MAN_TILT_TAU>)  _param_mc_man_tilt_tau,
+  DEFINE_PARAMETERS(
+      (ParamInt<px4::params::MC_AIRMODE>)_param_mc_airmode,
+      (ParamFloat<px4::params::MC_MAN_TILT_TAU>)_param_mc_man_tilt_tau,
 
-		(ParamFloat<px4::params::MC_ROLL_P>)        _param_mc_roll_p,
-		(ParamFloat<px4::params::MC_PITCH_P>)       _param_mc_pitch_p,
-		(ParamFloat<px4::params::MC_YAW_P>)         _param_mc_yaw_p,
-		(ParamFloat<px4::params::MC_YAW_WEIGHT>)    _param_mc_yaw_weight,
+      (ParamFloat<px4::params::MC_ROLL_P>)_param_mc_roll_p,
+      (ParamFloat<px4::params::MC_PITCH_P>)_param_mc_pitch_p,
+      (ParamFloat<px4::params::MC_YAW_P>)_param_mc_yaw_p,
+      (ParamFloat<px4::params::MC_YAW_WEIGHT>)_param_mc_yaw_weight,
 
-		(ParamFloat<px4::params::MC_ROLLRATE_MAX>)  _param_mc_rollrate_max,
-		(ParamFloat<px4::params::MC_PITCHRATE_MAX>) _param_mc_pitchrate_max,
-		(ParamFloat<px4::params::MC_YAWRATE_MAX>)   _param_mc_yawrate_max,
+      (ParamFloat<px4::params::MC_ROLLRATE_MAX>)_param_mc_rollrate_max,
+      (ParamFloat<px4::params::MC_PITCHRATE_MAX>)_param_mc_pitchrate_max,
+      (ParamFloat<px4::params::MC_YAWRATE_MAX>)_param_mc_yawrate_max,
 
-		/* Stabilized mode params */
-		(ParamFloat<px4::params::MPC_HOLD_DZ>) _param_mpc_hold_dz,
-		(ParamFloat<px4::params::MPC_MAN_TILT_MAX>) _param_mpc_man_tilt_max,
-		(ParamFloat<px4::params::MPC_MANTHR_MIN>) _param_mpc_manthr_min,
-		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,
-		(ParamFloat<px4::params::MPC_THR_HOVER>) _param_mpc_thr_hover,
-		(ParamInt<px4::params::MPC_THR_CURVE>) _param_mpc_thr_curve,
-		(ParamFloat<px4::params::MPC_YAW_EXPO>) _param_mpc_yaw_expo,
-
-		(ParamFloat<px4::params::COM_SPOOLUP_TIME>) _param_com_spoolup_time
-	)
+      /* Stabilized mode params */
+      (ParamFloat<px4::params::MPC_HOLD_DZ>)_param_mpc_hold_dz,
+      (ParamFloat<px4::params::MPC_MAN_TILT_MAX>)_param_mpc_man_tilt_max,
+      (ParamFloat<px4::params::MPC_MANTHR_MIN>)_param_mpc_manthr_min,
+      (ParamFloat<px4::params::MPC_THR_MAX>)_param_mpc_thr_max,
+      (ParamFloat<px4::params::MPC_THR_HOVER>)_param_mpc_thr_hover,
+      (ParamInt<px4::params::MPC_THR_CURVE>)_param_mpc_thr_curve,
+      (ParamFloat<px4::params::MPC_YAW_EXPO>)_param_mpc_yaw_expo,
+      (ParamInt<px4::params::MC_ATTI_METHOD>)_param_mc_atti_method,
+      (ParamFloat<px4::params::COM_SPOOLUP_TIME>)_param_com_spoolup_time)
 };

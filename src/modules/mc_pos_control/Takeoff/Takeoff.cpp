@@ -38,7 +38,7 @@
 #include "Takeoff.hpp"
 #include <mathlib/mathlib.h>
 #include <lib/geo/geo.h>
-
+//产生初始的速度值
 void TakeoffHandling::generateInitialRampValue(float velocity_p_gain)
 {
 	velocity_p_gain = math::max(velocity_p_gain, 0.01f);
@@ -51,7 +51,7 @@ void TakeoffHandling::updateTakeoffState(const bool armed, const bool landed, co
 	_spoolup_time_hysteresis.set_state_and_update(armed, now_us);
 
 	switch (_takeoff_state) {
-	case TakeoffState::disarmed:
+	case TakeoffState::disarmed://上锁
 		if (armed) {
 			_takeoff_state = TakeoffState::spoolup;
 
@@ -60,7 +60,7 @@ void TakeoffHandling::updateTakeoffState(const bool armed, const bool landed, co
 		}
 
 	// FALLTHROUGH
-	case TakeoffState::spoolup:
+	case TakeoffState::spoolup://电机加速
 		if (_spoolup_time_hysteresis.get_state()) {
 			_takeoff_state = TakeoffState::ready_for_takeoff;
 
@@ -69,7 +69,7 @@ void TakeoffHandling::updateTakeoffState(const bool armed, const bool landed, co
 		}
 
 	// FALLTHROUGH
-	case TakeoffState::ready_for_takeoff:
+	case TakeoffState::ready_for_takeoff://等待起飞
 		if (want_takeoff) {
 			_takeoff_state = TakeoffState::rampup;
 			_takeoff_ramp_progress = 0.f;
@@ -79,7 +79,7 @@ void TakeoffHandling::updateTakeoffState(const bool armed, const bool landed, co
 		}
 
 	// FALLTHROUGH
-	case TakeoffState::rampup:
+	case TakeoffState::rampup://速度斜坡（开始逐渐放开速度限制）
 		if (_takeoff_ramp_progress >= 1.f) {
 			_takeoff_state = TakeoffState::flight;
 

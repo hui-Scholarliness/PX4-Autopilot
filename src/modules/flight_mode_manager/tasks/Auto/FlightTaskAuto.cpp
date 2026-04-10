@@ -226,6 +226,7 @@ void FlightTaskAuto::rcHelpModifyYaw(float &yaw_sp)
 
 void FlightTaskAuto::_prepareLandSetpoints()
 {
+	//// 停用标准的平滑轨迹速度，接管垂直控制
 	_velocity_setpoint.setNaN(); // Don't take over any smoothed velocity setpoint
 
 	// Slow down automatic descend close to ground
@@ -234,7 +235,7 @@ void FlightTaskAuto::_prepareLandSetpoints()
 			       _param_mpc_land_speed.get(), _param_mpc_z_vel_max_dn.get());
 
 	bool range_dist_available = PX4_ISFINITE(_dist_to_bottom);
-
+	//
 	if (range_dist_available && _dist_to_bottom <= _param_mpc_land_alt3.get()) {
 		vertical_speed = _param_mpc_land_crwl.get();
 	}
@@ -250,6 +251,7 @@ void FlightTaskAuto::_prepareLandSetpoints()
 	_land_position = Vector3f(_target(0), _target(1), NAN);
 
 	// User input assisted landing
+	//飞行员微调降落点
 	if (_param_mpc_land_rc_help.get() && _sticks.checkAndUpdateStickInputs()) {
 		// Stick full up -1 -> stop, stick full down 1 -> double the speed
 		vertical_speed *= (1 - _sticks.getThrottleZeroCenteredExpo());
@@ -294,10 +296,10 @@ void FlightTaskAuto::_prepareLandSetpoints()
 			_land_position.xy() = Vector2f(_position);
 		}
 	}
-
+	//水平目标设为锁定好的降落点，Z轴保持 NAN
 	_position_setpoint = _land_position; // The last element of the land position has to stay NAN
-	_yaw_setpoint = _land_heading;
-	_velocity_setpoint(2) = vertical_speed;
+	_yaw_setpoint = _land_heading;// 锁死降落航向，防止转圈
+	_velocity_setpoint(2) = vertical_speed;// 注入我们刚刚算好的分段下降速度
 	_gear.landing_gear = landing_gear_s::GEAR_DOWN;
 }
 

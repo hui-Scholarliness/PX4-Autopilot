@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,21 +31,9 @@
 #
 ############################################################################
 
-add_subdirectory(AttitudeControl)
-add_subdirectory(SO3Control)
-
-px4_add_module(
-	MODULE modules__mc_att_control
-	MAIN mc_att_control
-	COMPILE_FLAGS
-		${MAX_CUSTOM_OPT_LEVEL}
-	SRCS
-		mc_att_control_main.cpp
-		mc_att_control.hpp
-	DEPENDS
-		AttitudeControl
-		SO3Control
-		mathlib
-		px4_work_queue
-		StickYaw
-	)
+px4_add_library(SO3Control
+	SO3Control.cpp
+	SO3Control.hpp
+)
+target_compile_options(SO3Control PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
+target_include_directories(SO3Control PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
