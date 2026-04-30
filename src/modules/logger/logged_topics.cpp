@@ -134,11 +134,14 @@ void LoggedTopics::add_default_topics()
 	add_topic("vehicle_magnetometer", 200);
 	add_topic("vehicle_rates_setpoint", 20);
 	add_topic("vehicle_roi", 1000);
-	add_topic("vehicle_status");
-	add_optional_topic("vtol_vehicle_status", 200);
-	add_topic("wind", 1000);
+        add_topic("vehicle_status");
+        add_optional_topic("vtol_vehicle_status", 200);
+        add_topic("wind", 1000);
+        add_topic("ladrc_status_ratex");
+        add_topic("ladrc_status_ratey");
+        add_topic("ladrc_status_ratez");
 
-	// multi topics
+        // multi topics
 	add_optional_topic_multi("actuator_outputs", 100, 3);
 	add_optional_topic_multi("airspeed_wind", 1000, 4);
 	add_optional_topic_multi("control_allocator_status", 200, 2);
