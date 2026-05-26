@@ -135,8 +135,10 @@ void Battery::updateBatteryStatus(const hrt_abstime &timestamp)
 		calculateStateOfChargeVoltageBased(_voltage_filter_v.getState(), _current_filter_a.getState());
 
 	if (!_external_state_of_charge) {
+		//新增by wzh 添加CAN来的电压和实际物理测量的物理电压之间的比较，取最低值
 		estimateStateOfCharge();
 	}
+
 
 	computeScale();
 

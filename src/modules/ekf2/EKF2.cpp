@@ -50,8 +50,12 @@ static px4::atomic<EKF2Selector *> _ekf2_selector {nullptr};
 #endif // CONFIG_EKF2_MULTI_INSTANCE
 
 EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
-	ModuleParams(nullptr),
+	ModuleParams(nullptr),//参数动态加载
+	//EKF2 并不是一个拥有独立死循环的完整线程（Thread），而是一个工作队列项（Work Item）。
+	//它被挂载到飞控的高优先级工作队列中，只有当 IMU 数据到来时，系统才会调度它运行。
+	//这样设计极大节省了单片机的 RAM（不需要为 EKF2 单独分配庞大的栈空间）
 	ScheduledWorkItem(MODULE_NAME, config),
+	//multi_mode是为了管理多imu的问题
 	_replay_mode(replay_mode && !multi_mode),
 	_multi_mode(multi_mode),
 	_instance(multi_mode ? -1 : 0),
@@ -215,6 +219,7 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_gyr_b_lim(_params->gyro_bias_lim)
 {
 	// advertise expected minimal topic set immediately to ensure logging
+	//只有当一个话题被“宣告（advertise）”存在后，日志系统才会开始在 SD 卡上记录它。
 	_attitude_pub.advertise();
 	_local_position_pub.advertise();
 
@@ -407,13 +412,14 @@ void EKF2::Run()
 	}
 
 	// check for parameter updates
+	//检查地面站参数配置变化
 	if (_parameter_update_sub.updated() || !_callback_registered) {
 		// clear update
 		parameter_update_s pupdate;
 		_parameter_update_sub.copy(&pupdate);
 
 		// update parameters from storage
-		updateParams();
+		updateParams();// 把闪存里的新参数拉进来
 
 		VerifyParams();
 
@@ -438,7 +444,7 @@ void EKF2::Run()
 
 #endif // CONFIG_EKF2_AIRSPEED
 
-		_ekf.updateParameters();
+		_ekf.updateParameters();// 把新参数推给底层算法引擎
 	}
 
 	if (!_callback_registered) {
@@ -458,11 +464,12 @@ void EKF2::Run()
 			return;
 		}
 	}
-
+//查看比如机载计算机的更上级指令
 	if (_vehicle_command_sub.updated()) {
 		vehicle_command_s vehicle_command;
 
 		if (_vehicle_command_sub.update(&vehicle_command)) {
+			//// 指令 1：设置全局原点 (比如点击地面站地图设置 Home 点)
 			if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN) {
 				double latitude = vehicle_command.param5;
 				double longitude = vehicle_command.param6;
@@ -480,8 +487,9 @@ void EKF2::Run()
 						_instance, latitude, longitude, static_cast<double>(altitude));
 				}
 			}
-
+			// 指令 2：外部视觉系统强行注入位置 (用于隧道或无 GPS 环境)
 			if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_EXTERNAL_POSITION_ESTIMATE) {
+				//如果当前正在“惯性死区推算(dead_reckoning)”，则允许外部重置位置
 				if ((_ekf.control_status_flags().wind_dead_reckoning || _ekf.control_status_flags().inertial_dead_reckoning) &&
 				    PX4_ISFINITE(vehicle_command.param2) && PX4_ISFINITE(vehicle_command.param5) && PX4_ISFINITE(vehicle_command.param6)) {
 
